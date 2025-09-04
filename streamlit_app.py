@@ -84,21 +84,21 @@ st.markdown("""
         font-weight: 500;
         line-height: 1.6;
     }
-    
+
     .welcome-message h2 {
         color: #2c3e50;
         font-weight: bold;
         margin-bottom: 15px;
         text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
     }
-    
+
     .welcome-message h3 {
         color: #34495e;
         font-weight: bold;
         margin-bottom: 10px;
         text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
     }
-    
+
     .welcome-message p {
         color: #2c3e50;
         font-size: 1.1rem;
@@ -115,9 +115,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# MBTI 질문 타입 순서 정의 (8개 질문을 위한 균형잡힌 배치)
-QUESTION_TYPES = ["E/I", "S/N", "T/F", "J/P", "E/I", "S/N", "T/F", "J/P"]
 
 def generate_all_questions(client, question_count=8):
     """OpenAI API를 사용하여 지정된 개수의 MBTI 질문을 한번에 생성"""
@@ -163,7 +160,6 @@ def generate_all_questions(client, question_count=8):
                         "content": "당신은 MBTI 전문가입니다. 정확하고 균형잡힌 8개의 MBTI 질문을 생성해주세요. 각 차원별로 2개씩, 총 8개의 서로 다른 질문을 만들어주세요. 반드시 올바른 JSON 형식으로만 응답하고, 다른 설명이나 텍스트는 포함하지 마세요."
                                    "질문의 어휘는 감성적인 표현으로 하고 창의적이고 다양한 생각을 하지만 구체적인 상황을 제시하여 두 개의 선택지로 답할 수 있도록 만들어주세요."
                                    "질문은 서로 다른 상황과 맥락을 다루어야 하며, 중복되지 않아야 합니다."
-                                   "질문은 한국어로 작성해주세요."
                     },
                     {
                         "role": "user",
