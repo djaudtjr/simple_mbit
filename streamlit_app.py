@@ -354,12 +354,6 @@ with st.sidebar:
     st.markdown("### ⚙️ 설정")
     st.markdown("---")
 
-    openai_api_key = st.text_input(
-        "🔑 OpenAI API 키",
-        type="password",
-        help="OpenAI API 키를 입력해주세요. 질문 생성에 사용됩니다."
-    )
-
     # 질문 개수 선택
     st.markdown("### 📊 질문 개수 설정")
     question_options = [4, 8, 12, 16, 20]
@@ -382,25 +376,20 @@ with st.sidebar:
             st.session_state.questions_generated = False
             st.info(f"질문 개수가 {selected_count}개로 변경되어 테스트가 초기화되었습니다.")
 
-    if not openai_api_key:
-        st.warning("⚠️ OpenAI API 키를 입력해주세요.")
-        st.info("💡 API 키는 [OpenAI 웹사이트](https://platform.openai.com/api-keys)에서 발급받을 수 있습니다.")
-    else:
-        st.success("✅ API 키가 설정되었습니다!")
+    # OpenAI 클라이언트 초기화 (항상 실행)
+    openai_api_key = st.secrets['openai']['API_KEY']
+    client = OpenAI(api_key=openai_api_key)
 
-        # OpenAI 클라이언트 초기화
-        client = OpenAI(api_key=openai_api_key)
-
-        # 테스트 시작 버튼
-        if not st.session_state.test_started:
-            if st.button("🚀 테스트 시작하기", use_container_width=True):
-                st.session_state.test_started = True
-                st.session_state.current_question = 0
-                # 모든 질문을 한번에 생성
-                with st.spinner(f"🤔 AI가 {st.session_state.question_count}개의 맞춤형 질문을 생성하고 있습니다..."):
-                    st.session_state.all_questions = generate_all_questions(client, st.session_state.question_count)
-                    st.session_state.questions_generated = True
-                st.rerun()
+    # 테스트 시작 버튼
+    if not st.session_state.test_started:
+        if st.button("🚀 테스트 시작하기", use_container_width=True):
+            st.session_state.test_started = True
+            st.session_state.current_question = 0
+            # 모든 질문을 한번에 생성
+            with st.spinner(f"🤔 AI가 {st.session_state.question_count}개의 맞춤형 질문을 생성하고 있습니다..."):
+                st.session_state.all_questions = generate_all_questions(client, st.session_state.question_count)
+                st.session_state.questions_generated = True
+            st.rerun()
 
     st.markdown("---")
     st.markdown("### 📊 테스트 진행상황")
@@ -486,17 +475,6 @@ if st.session_state.test_completed:
         jp_type = "판단 (J)" if type_counts["J"] >= type_counts["P"] else "인식 (P)"
         st.metric("생활 양식", jp_type, f"J:{type_counts['J']} P:{type_counts['P']}")
 
-# API 키가 없으면 테스트 시작 불가
-elif not openai_api_key:
-    st.markdown(
-        '<div class="welcome-message">'
-        '<h2>🔑 시작하기 전에...</h2>'
-        '<p>AI가 실시간으로 생성하는 맞춤형 MBTI 질문을 받기 위해 왼쪽 사이드바에서 OpenAI API 키를 입력해주세요.</p>'
-        '<p>각 질문은 이전 답변을 바탕으로 동적으로 생성되어 더 정확한 결과를 제공합니다!</p>'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
 # 테스트 진행 중
 elif st.session_state.test_started and st.session_state.questions_generated and st.session_state.current_question < st.session_state.question_count:
     if st.session_state.all_questions and st.session_state.current_question < len(st.session_state.all_questions):
@@ -553,7 +531,7 @@ else:
         '<h2>🎯 AI 기반 MBTI 성격 테스트에 오신 것을 환영합니다!</h2>'
         '<p>AI가 생성하는 맞춤형 질문으로 당신의 성격 유형을 알아보세요.</p>'
         '<p>4개부터 20개까지 질문 개수를 선택할 수 있으며, 더 많은 질문일수록 정확한 결과를 얻을 수 있습니다.</p>'
-        '<p>왼쪽 사이드바에서 OpenAI API 키를 입력하고 질문 개수를 선택한 후 테스트를 시작해주세요!</p>'
+        '<p>왼쪽 사이드바에서 질문 개수를 선택한 후 테스트를 시작해주세요!</p>'
         '</div>',
         unsafe_allow_html=True
     )
