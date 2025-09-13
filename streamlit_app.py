@@ -2,6 +2,7 @@ import streamlit as st
 import openai
 from openai import OpenAI
 import json
+import urllib.parse
 
 # 페이지 설정
 st.set_page_config(
@@ -11,8 +12,78 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 커스텀 CSS 스타일
+# 커스텀 CSS 스타일 및 Kakao SDK
 st.markdown("""
+<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"
+        integrity="sha384-TiCUE00h649CAMonG018J2ujOgDKW/kVWlChEuu4jK2vxfAAD0eZxzCKakxg55G4" 
+        crossorigin="anonymous"></script>
+<script>
+    // 카카오 SDK 초기화 (동적으로 키 설정)
+    function initKakaoWithKey(apiKey) {
+        if (typeof Kakao !== 'undefined' && apiKey && !Kakao.isInitialized()) {
+            try {
+                Kakao.init(apiKey);
+                console.log('Kakao SDK 초기화 완료:', apiKey.substring(0, 10) + '...');
+                return true;
+            } catch (error) {
+                console.error('Kakao SDK 초기화 실패:', error);
+                return false;
+            }
+        }
+        return false;
+    }
+    
+    // 카카오톡 공유 함수
+    function shareKakao(title, description, imageUrl, webUrl) {
+        if (typeof Kakao === 'undefined') {
+            alert('카카오 SDK를 불러올 수 없습니다. 다른 공유 방법을 이용해주세요.');
+            return false;
+        }
+        
+        if (!Kakao.isInitialized()) {
+            alert('카카오 앱 키가 설정되지 않았습니다. 관리자에게 문의하세요.');
+            return false;
+        }
+        
+        Kakao.Share.sendDefault({
+            objectType: 'feed',
+            content: {
+                title: title,
+                description: description,
+                imageUrl: imageUrl || 'https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png',
+                link: {
+                    mobileWebUrl: webUrl,
+                    webUrl: webUrl,
+                },
+            },
+            buttons: [
+                {
+                    title: '테스트 하기',
+                    link: {
+                        mobileWebUrl: webUrl,
+                        webUrl: webUrl,
+                    },
+                },
+            ],
+            // 카카오톡 미설치 시 카카오톡 설치 경로이동
+            installTalk: true,
+        });
+        return true;
+    }
+    
+    // Streamlit과 JavaScript 간의 통신을 위한 함수
+    function initKakaoShare() {
+        window.shareToKakao = shareKakao;
+    }
+    
+    // DOM 로드 완료 후 초기화
+    document.addEventListener('DOMContentLoaded', initKakaoShare);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initKakaoShare);
+    } else {
+        initKakaoShare();
+    }
+</script>
 <style>
     .main {
         padding-top: 2rem;
@@ -345,6 +416,8 @@ if "questions_generated" not in st.session_state:
     st.session_state.questions_generated = False
 if "question_count" not in st.session_state:
     st.session_state.question_count = 8
+if "kakao_js_key" not in st.session_state:
+    st.session_state.kakao_js_key = ""
 
 # 메인 타이틀
 st.markdown('<h1 class="stTitle">🧠 Simple MBTI 성격 테스트 🔍</h1>', unsafe_allow_html=True)
@@ -379,6 +452,59 @@ with st.sidebar:
     # OpenAI 클라이언트 초기화 (항상 실행)
     openai_api_key = st.secrets['openai']['API_KEY']
     client = OpenAI(api_key=openai_api_key)
+
+    st.markdown("---")
+    st.markdown("### 💬 카카오톡 공유 설정")
+    st.markdown("카카오톡 공유 기능을 사용하려면 카카오 JavaScript 키가 필요합니다.")
+    
+    # 카카오 키 입력
+    kakao_key_input = st.text_input(
+        "카카오 JavaScript 키 (선택사항)",
+        value=st.session_state.kakao_js_key,
+        type="password",
+        help="카카오 개발자 콘솔에서 발급받은 JavaScript 키를 입력하세요."
+    )
+    
+    if kakao_key_input != st.session_state.kakao_js_key:
+        st.session_state.kakao_js_key = kakao_key_input
+        if kakao_key_input:
+            st.success("✅ 카카오 JavaScript 키가 설정되었습니다!")
+            # 키가 설정되면 JavaScript에 실시간으로 적용
+            st.markdown(f"""
+            <script>
+                if (typeof Kakao !== 'undefined' && !Kakao.isInitialized()) {{
+                    try {{
+                        Kakao.init('{kakao_key_input}');
+                        console.log('Kakao SDK 초기화 완료');
+                    }} catch (error) {{
+                        console.error('Kakao SDK 초기화 실패:', error);
+                    }}
+                }}
+            </script>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("💡 키를 입력하지 않으면 웹 공유 방식이 사용됩니다.")
+    
+    # 카카오 키 발급 방법 안내
+    with st.expander("🔑 카카오 JavaScript 키 발급 방법"):
+        st.markdown("""
+        1. **카카오 개발자 콘솔** 접속: https://developers.kakao.com
+        2. **로그인** 후 "내 애플리케이션" 클릭
+        3. **애플리케이션 추가하기** (앱 이름: MBTI 테스트 등)
+        4. **요약 정보**에서 **JavaScript 키** 복사
+        5. **플랫폼 설정**에서 **Web 플랫폼 등록**
+           - `http://localhost:8501` (로컬 테스트용)
+           - `https://simple-mbti.streamlit.app` (배포용)
+        6. 위에서 복사한 JavaScript 키를 입력란에 붙여넣기
+        
+        ⚠️ **주의**: JavaScript 키는 공개되어도 상관없지만, REST API 키는 절대 공개하면 안됩니다.
+        """)
+    
+    if st.session_state.kakao_js_key:
+        st.markdown("🟢 **카카오톡 SDK 공유 모드**")
+    else:
+        st.markdown("🟡 **웹 공유 모드** (키 미설정)")
+    
 
     # 테스트 시작 버튼
     if not st.session_state.test_started:
@@ -437,6 +563,30 @@ def calculate_mbti():
 
     return mbti_type
 
+def create_share_message(mbti_result):
+    """카카오톡 공유용 메시지 생성"""
+    message = f"""🧠 MBTI 성격 테스트 결과 🔍
+
+🎉 나의 MBTI 유형: {mbti_result}
+{MBTI_DESCRIPTIONS[mbti_result]}
+
+✨ AI가 생성한 맞춤형 질문으로 알아본 나의 성격!
+당신도 테스트해보세요! 
+
+#MBTI #성격테스트 #AI테스트"""
+    
+    return message
+
+def create_kakao_share_url(message):
+    """카카오톡 공유 URL 생성 (개선된 버전)"""
+    # URL과 텍스트를 별도로 인코딩
+    encoded_message = urllib.parse.quote(message, safe='')
+    encoded_url = urllib.parse.quote("https://simple-mbti.streamlit.app", safe=':/?#[]@!$&\'()*+,;=')
+    
+    # 더 안정적인 카카오 공유 URL 구조 사용
+    kakao_url = f"https://sharer.kakao.com/talk/friends/picker/link?url={encoded_url}&text={encoded_message}"
+    return kakao_url
+
 # 테스트 완료 후 결과 표시
 if st.session_state.test_completed:
     mbti_result = calculate_mbti()
@@ -474,6 +624,122 @@ if st.session_state.test_completed:
     with col4:
         jp_type = "판단 (J)" if type_counts["J"] >= type_counts["P"] else "인식 (P)"
         st.metric("생활 양식", jp_type, f"J:{type_counts['J']} P:{type_counts['P']}")
+
+    # 카카오톡 공유 기능
+    st.markdown("### 📱 결과 공유하기")
+    
+    # 공유 메시지 생성
+    share_message = create_share_message(mbti_result)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # 카카오톡 공유 버튼 (SDK 사용)
+        st.markdown("**💬 카카오톡 공유**")
+        
+        # JavaScript 키 설정 여부에 따른 다른 방식 제공
+        # 공유용 데이터 준비
+        share_title = f"🧠 MBTI 테스트 결과: {mbti_result}"
+        share_description = f"{MBTI_DESCRIPTIONS[mbti_result]}\n\n✨ AI가 생성한 맞춤형 질문으로 알아본 나의 성격!"
+        share_url = "https://simple-mbti.streamlit.app"
+        share_image = "https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png"
+        
+        # 카카오링크 API 버튼 (JavaScript 키가 있을 때 작동)
+        kakao_button_id = f"kakao-share-btn-{mbti_result}"
+        st.markdown(f"""
+        <div style="text-align: center; margin: 10px 0;">
+            <button id="{kakao_button_id}" 
+                    style="background: #FEE500; color: #3C1E1E; border: none;
+                           padding: 12px 20px; border-radius: 8px; font-weight: bold; 
+                           font-size: 14px; cursor: pointer; transition: all 0.3s ease;"
+                    onmouseover="this.style.backgroundColor='#FDD835'"
+                    onmouseout="this.style.backgroundColor='#FEE500'"
+                    onclick="shareToKakaoIfAvailable('{share_title}', '{share_description.replace(chr(10), " ").replace("'", chr(92)+"'")}', '{share_image}', '{share_url}')">
+                💬 카카오톡으로 공유하기
+            </button>
+        </div>
+        
+        <script>
+        function shareToKakaoIfAvailable(title, description, imageUrl, webUrl) {{
+            // 먼저 카카오 키를 확인하고 초기화 시도
+            const kakaoKey = '{st.session_state.kakao_js_key}';
+            if (kakaoKey && typeof window.initKakaoWithKey === 'function') {{
+                window.initKakaoWithKey(kakaoKey);
+            }}
+            
+            // 카카오 SDK를 통한 공유 시도
+            if (typeof window.shareToKakao === 'function') {{
+                if (window.shareToKakao(title, description, imageUrl, webUrl)) {{
+                    console.log('카카오톡 SDK 공유 성공');
+                    return;
+                }}
+            }}
+            
+            // SDK가 없거나 실패한 경우 대체 방법 사용
+            console.log('카카오톡 SDK 공유 실패, 웹 공유 방식 사용');
+            const fallbackMessage = encodeURIComponent(`${{title}}
+
+${{description}}
+
+테스트 해보기: ${{webUrl}}`);
+            
+            const kakaoWebUrl = `https://sharer.kakao.com/talk/friends/picker/link?url=${{encodeURIComponent(webUrl)}}&text=${{fallbackMessage}}`;
+            
+            // 새 창에서 공유 페이지 열기
+            const newWindow = window.open(kakaoWebUrl, '_blank', 'width=500,height=600');
+            if (!newWindow) {{
+                // 팝업이 차단된 경우 현재 창에서 열기
+                window.location.href = kakaoWebUrl;
+            }}
+        }}
+        </script>
+        """, unsafe_allow_html=True)
+        
+        # 추가 공유 옵션들
+        col1_1, col1_2 = st.columns(2)
+        
+        with col1_1:
+            # SMS 공유
+            share_text = f"MBTI 테스트 결과: {mbti_result} - {share_url}"
+            sms_url = f"sms:?body={urllib.parse.quote(share_text)}"
+            st.markdown(f"""
+            <div style="text-align: center; margin: 5px 0;">
+                <a href="{sms_url}" target="_blank" 
+                   style="display: inline-block; background: #34A853; color: white; 
+                          padding: 8px 12px; border-radius: 6px; text-decoration: none; 
+                          font-weight: bold; font-size: 12px;">
+                    📱 SMS
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col1_2:
+            # 이메일 공유
+            email_subject = urllib.parse.quote(share_title)
+            email_body = urllib.parse.quote(f"{share_description}\n\n테스트 해보기: {share_url}")
+            email_url = f"mailto:?subject={email_subject}&body={email_body}"
+            st.markdown(f"""
+            <div style="text-align: center; margin: 5px 0;">
+                <a href="{email_url}" target="_blank" 
+                   style="display: inline-block; background: #EA4335; color: white; 
+                          padding: 8px 12px; border-radius: 6px; text-decoration: none; 
+                          font-weight: bold; font-size: 12px;">
+                    📧 이메일
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with col2:
+        # 텍스트 복사 버튼
+        if st.button("📋 결과 복사하기", use_container_width=True):
+            st.code(share_message, language=None)
+            st.success("✅ 위 텍스트를 복사해서 원하는 곳에 붙여넣으세요!")
+    
+    with col3:
+        # URL 공유 버튼 (현재 페이지 URL)
+        if st.button("🔗 링크 공유하기", use_container_width=True):
+            st.code("https://simple-mbti.streamlit.app", language=None)
+            st.success("✅ 위 링크를 복사해서 친구들에게 공유하세요!")
 
 # 테스트 진행 중
 elif st.session_state.test_started and st.session_state.questions_generated and st.session_state.current_question < st.session_state.question_count:
