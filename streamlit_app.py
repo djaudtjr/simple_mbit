@@ -356,12 +356,12 @@ with st.sidebar:
 
     # 질문 개수 선택
     st.markdown("### 📊 질문 개수 설정")
+    st.markdown("💡 질문 개수 설정은 기본 8개이며, 16가지 MBTI 유형을 알아가기 위한 질문 개수입니다. 더 많은 질문을 선택하실수록 보다 정확한 성격 유형 결과를 확인하실 수 있어요! 😊")
     question_options = [4, 8, 12, 16, 20]
     selected_count = st.selectbox(
         "질문 개수를 선택하세요 (4의 배수)",
         options=question_options,
-        index=question_options.index(st.session_state.question_count),
-        help="더 많은 질문일수록 정확한 결과를 얻을 수 있습니다."
+        index=question_options.index(st.session_state.question_count)
     )
 
     if selected_count != st.session_state.question_count:
